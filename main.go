@@ -28,7 +28,7 @@ type GenericError struct {
 // Global variables are frowned upon but I'm targeting max time limit of ~ 2 hrs
 var globalQueue Queue
 
-var jobCountID = 1
+var jobCountID = 0
 
 func NewJob(j EnqueueRequest) Job {
 	job := Job{Type: j.Type, Status: Queued}
@@ -46,6 +46,7 @@ func main() {
 	}
 
 	globalQueue = NewQueue(*maxQueue)
+	dispatcher.StartDispatcher(10)
 
 	sm := mux.NewRouter()
 

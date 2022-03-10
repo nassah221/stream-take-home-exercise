@@ -1,4 +1,4 @@
-module cloudflare/assignment
+module exp/job-queue
 
 go 1.17
 

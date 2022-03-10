@@ -11,22 +11,24 @@ import (
 // I'm also making an assumption that I have to keep track of all jobs even after their life-cycle ends
 // i.e. after the job is concluded, so getting a concluded job will return a JSON response if the job existed in the first place
 
-// There's also duplication in this implementation as I have to operate on the same job in 2 different places
-// A single slice of all the jobs would be a cleaner solution but the trade-off would be verbosity
-// 1) To search for a job to conclude, I would have to walk that single slice linearly until I find it. By separating the Dequeued jobs
-// it's guaranteed that only the jobs that are dequeued are available to be concluded
-// 2) Having a map allows me to look up a job_id with a single val, ok statement
+// // There's also duplication in this implementation as I have to operate on the same job in 2 different places
+// // A single slice of all the jobs would be a cleaner solution but the trade-off would be verbosity
+// // 1) To search for a job to conclude, I would have to walk that single slice linearly until I find it. By separating the Dequeued jobs
+// // it's guaranteed that only the jobs that are dequeued are available to be concluded
+// // 2) Having a map allows me to look up a job_id with a single val, ok statement
+
+// Dequeued data structure was just a place holder for the jobs that were running
+// I have implemented a dispatcher and worker whose jobs are to dispatch jobs from the job queue
+// and process said jobs respectively
 type Queue struct {
-	Jobs     map[int]*Job
-	Enqueued chan Job
-	Dequeued []*Job
+	Jobs     map[int]*Job // A persistent collection of all jobs received
+	Enqueued chan Job     // Job  queue
 }
 
 func NewQueue(bufSize int) Queue {
 	return Queue{
 		Jobs:     make(map[int]*Job),
 		Enqueued: make(chan Job, bufSize),
-		Dequeued: make([]*Job, 0),
 	}
 }
 
@@ -36,34 +38,51 @@ func (q *Queue) Enqueue(j Job) {
 }
 
 func (q *Queue) Dequeue() (*Job, error) {
-	// Return an error if no are no jobs queued
-	select {
-	case j := <-q.Enqueued:
-		// I'm not sure about this. Keeping track of the same object in multiple places is not ok
-		// but I couldn't come up with a cleaner approach within the time limit
-		trackedJob := q.Jobs[j.ID]
-		trackedJob.Status = InProgress
-		q.Dequeued = append(q.Dequeued, trackedJob)
-		return trackedJob, nil
-	default:
-		return &Job{}, fmt.Errorf("no jobs queued")
+	var deqJob *Job
+	done := make(chan struct{})
+	go func() {
+		deqJob = <-dispatcher.dequeuedJob
+		done <- struct{}{}
+	}()
+	dispatcher.dequeueSig <- struct{}{}
+	<-done
+	if deqJob != nil {
+		q.Jobs[deqJob.ID] = deqJob
+		return deqJob, nil
 	}
+
+	return &Job{}, fmt.Errorf("no jobs queued or all workers busy")
 }
 
 func (q *Queue) ConcludeJob(id int) error {
-	for i, job := range q.Dequeued {
-		if job.ID == id {
-			trackedJob := q.Jobs[job.ID]
-			trackedJob.Status = Concluded
-
-			// If the job was found, remove it from the dequeued slice
-			q.Dequeued = append(q.Dequeued[:i], q.Dequeued[i+1:]...)
-
-			log.Printf("[DEBUG] Dequeued Jobs: %#+v", q.Dequeued)
-			return nil
-		}
+	j, ok := q.Jobs[id]
+	if !ok {
+		return fmt.Errorf("job %d not found", id)
 	}
-	return fmt.Errorf("job not found")
+
+	if j.Status != InProgress {
+		if j.Status == Queued {
+			return fmt.Errorf("job is enqueued")
+		}
+
+		return fmt.Errorf("job has already concluded")
+	}
+
+	if workerID := j.Worker; workerID != 0 {
+		log.Printf("Job %d is assigned to Worker %d", j.ID, j.Worker)
+
+		done := make(chan struct{})
+		go func() {
+			_ = <-dispatcher.concludedJob
+			done <- struct{}{}
+		}()
+		dispatcher.concludeSig <- ConcludeJobSignal{JobID: j.ID, WorkerID: j.Worker}
+		<-done
+
+		return nil
+	}
+	log.Println("[This should not happen] Worker id should not be zero")
+	return fmt.Errorf("unexpected error")
 }
 
 func (q *Queue) findJobByID(id int) (*Job, error) {

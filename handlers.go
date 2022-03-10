@@ -21,8 +21,6 @@ func EnqueueHandler(rw http.ResponseWriter, r *http.Request) {
 		ToJSON(&GenericError{Message: err.Error()}, rw)
 		return
 	}
-
-	// // TODO: Queue the job and return the ID
 	j := NewJob(jobReq)
 	globalQueue.Enqueue(j)
 
@@ -51,7 +49,9 @@ func ConcludeHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := globalQueue.ConcludeJob(id); err != nil {
-		http.Error(rw, "Job not found", http.StatusNotFound)
+		log.Println(err)
+		// Based on the error, different http status codes should be used for all workers busy and job id not found
+		http.Error(rw, err.Error(), http.StatusNotFound)
 		return
 	}
 
