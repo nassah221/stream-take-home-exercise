@@ -19,6 +19,10 @@ const (
 	Concluded  JobStatus = "CONCLUDED"
 )
 
+// I haven't thought about how the job type would come to affect the queue but here's what comes to my mind
+// 1) Upon reaching a certain buffer capacity or after regular interavals, the job queue should be flushed into to temporary buffer
+// 2) Time critical jobs should come first in order and the queue should be repopulated
+// These are concerns for a job scheduler which would sit on top of the queue
 type JobType string
 
 const (
