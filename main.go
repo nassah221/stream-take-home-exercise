@@ -55,7 +55,7 @@ func main() {
 	postRouter.HandleFunc("/jobs/{id:[0-9]+}/conclude", ConcludeHandler)
 
 	getRouter := sm.Methods(http.MethodGet).Subrouter()
-	getRouter.HandleFunc("/jobs/{id:[0-9+]}", GetJobHandler)
+	getRouter.HandleFunc("/jobs/{id:[0-9]+}", GetJobHandler)
 
 	s := http.Server{
 		Addr:         *bindAddr,         // configure the bind address
