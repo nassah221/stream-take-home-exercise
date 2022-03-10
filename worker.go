@@ -36,7 +36,7 @@ func (w *Worker) Start() {
 
 				j.Status = InProgress
 				log.Printf("Job %d in progress", j.ID)
-				jobrunner.dequeuedJob <- j
+				jobRunner.dequeuedJob <- j
 				// Hold on to the job until concluded - usually there will be a job processor
 				// that the worker is going to block on until it gets the conclude signal
 				<-w.conclude
@@ -47,7 +47,7 @@ func (w *Worker) Start() {
 				j.Worker = 0
 				w.currentJob = nil
 
-				jobrunner.concludedJob <- j
+				jobRunner.concludedJob <- j
 				break
 
 			case <-w.stop:

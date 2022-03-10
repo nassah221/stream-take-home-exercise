@@ -6,7 +6,7 @@ import (
 )
 
 // I'm not sure if this is the appropriate way to keep track of job requests
-// however, since every job_id is a unique int, I can look up from the map through it's key('ID')
+// however, since every job_id is a unique int, I can look up from the map through its key('ID')
 
 // I'm also making an assumption that I have to keep track of all jobs even after their life-cycle ends
 // i.e. after the job is concluded, so getting a concluded job will return a JSON response if the job existed in the first place
@@ -22,7 +22,7 @@ import (
 // and process said jobs respectively
 type Queue struct {
 	Jobs     map[int]*Job // A persistent collection of all jobs received
-	Enqueued chan Job     // Job  queue
+	Enqueued chan Job     // Job queue
 }
 
 func NewQueue(bufSize int) Queue {
@@ -41,10 +41,10 @@ func (q *Queue) Dequeue() (*Job, error) {
 	var deqJob *Job
 	done := make(chan struct{})
 	go func() {
-		deqJob = <-dispatcher.dequeuedJob
+		deqJob = <-jobRunner.dequeuedJob
 		done <- struct{}{}
 	}()
-	dispatcher.dequeueSig <- struct{}{}
+	jobRunner.dequeueSig <- struct{}{}
 	<-done
 	if deqJob != nil {
 		q.Jobs[deqJob.ID] = deqJob
@@ -73,15 +73,15 @@ func (q *Queue) ConcludeJob(id int) error {
 
 		done := make(chan struct{})
 		go func() {
-			_ = <-dispatcher.concludedJob
+			_ = <-jobRunner.concludedJob
 			done <- struct{}{}
 		}()
-		dispatcher.concludeSig <- ConcludeJobSignal{JobID: j.ID, WorkerID: j.Worker}
+		jobRunner.concludeSig <- ConcludeJobSignal{JobID: j.ID, WorkerID: j.Worker}
 		<-done
 
 		return nil
 	}
-	log.Println("[This should not happen] Worker id should not be zero")
+	log.Println("[This should not be possible] Worker id should not be zero")
 	return fmt.Errorf("unexpected error")
 }
 
