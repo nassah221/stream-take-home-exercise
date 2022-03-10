@@ -8,7 +8,7 @@ type ConcludeJobSignal struct {
 }
 
 var WorkerQueue chan chan *Job
-var jobrunner = NewDispatcher()
+var jobRunner = NewJobRunner()
 
 type JobRunner struct {
 	workers      map[int]*Worker        // Map of workers
@@ -18,7 +18,7 @@ type JobRunner struct {
 	concludedJob chan *Job
 }
 
-func NewDispatcher() JobRunner {
+func NewJobRunner() JobRunner {
 	return JobRunner{
 		workers:      make(map[int]*Worker),
 		dequeueSig:   make(chan struct{}),
@@ -28,7 +28,7 @@ func NewDispatcher() JobRunner {
 	}
 }
 
-func (d *JobRunner) StartDispatcher(nworkers int) {
+func (d *JobRunner) StartJobRunner(nworkers int) {
 	WorkerQueue = make(chan chan *Job, nworkers)
 
 	// Create n number of workers
@@ -52,11 +52,11 @@ func (d *JobRunner) StartDispatcher(nworkers int) {
 						worker <- &j
 					default:
 						log.Println("No jobs queued")
-						jobrunner.dequeuedJob <- nil
+						jobRunner.dequeuedJob <- nil
 					}
 				default:
 					log.Println("All workers busy")
-					jobrunner.dequeuedJob <- nil
+					jobRunner.dequeuedJob <- nil
 				}
 			case s := <-d.concludeSig:
 				worker, ok := d.workers[s.WorkerID]
