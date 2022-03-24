@@ -1,6 +1,8 @@
-package main
+package handlers
 
 import (
+	"exp/job-queue/data"
+	"exp/job-queue/pkg/job"
 	"log"
 	"net/http"
 	"strconv"
@@ -8,10 +10,23 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func EnqueueHandler(rw http.ResponseWriter, r *http.Request) {
-	log.Println("Handle Enqueue")
+type GenericError struct {
+	Message string `json:"message"`
+}
 
-	var jobReq EnqueueRequest
+type Handler struct {
+	l *log.Logger
+	q data.Queue
+}
+
+func New(l *log.Logger, q data.Queue) Handler {
+	return Handler{l, q}
+}
+
+func (h *Handler) EnqueueHandler(rw http.ResponseWriter, r *http.Request) {
+	h.l.Println("[DEBUG] Handle Enqueue")
+
+	var jobReq job.EnqueueRequest
 
 	// I would like to implement better validation
 	if err := jobReq.FromJSON(r.Body); err != nil {
@@ -21,25 +36,26 @@ func EnqueueHandler(rw http.ResponseWriter, r *http.Request) {
 		ToJSON(&GenericError{Message: err.Error()}, rw)
 		return
 	}
-	j := NewJob(jobReq)
-	globalQueue.Enqueue(j)
+	j := job.NewJob(jobReq)
+	h.q.Enqueue(j)
 
-	res := EnqueueResponse{ID: j.ID}
+	res := job.EnqueueResponse{ID: j.ID}
 	ToJSON(&res, rw)
 }
 
-func DequeueHandler(rw http.ResponseWriter, r *http.Request) {
+func (h *Handler) DequeueHandler(rw http.ResponseWriter, r *http.Request) {
 	log.Println("Handle Dequeue")
-	job, err := globalQueue.Dequeue()
+	j, err := h.q.Dequeue()
 
 	if err != nil {
 		http.Error(rw, "No jobs queued", http.StatusNotFound)
 		return
 	}
 
-	job.ToJSON(rw)
+	j.ToJSON(rw)
 }
-func ConcludeHandler(rw http.ResponseWriter, r *http.Request) {
+
+func (h *Handler) ConcludeHandler(rw http.ResponseWriter, r *http.Request) {
 	log.Println("Handle Conclude")
 
 	vars := mux.Vars(r)
@@ -48,7 +64,7 @@ func ConcludeHandler(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "Unable to parse id", http.StatusBadRequest)
 		return
 	}
-	if err := globalQueue.ConcludeJob(id); err != nil {
+	if err := h.q.Conclude(id); err != nil {
 		log.Println(err)
 		// Based on the error, different http status codes should be used for all workers busy and job id not found
 		http.Error(rw, err.Error(), http.StatusNotFound)
@@ -58,7 +74,7 @@ func ConcludeHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusAccepted)
 }
 
-func GetJobHandler(rw http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetJobHandler(rw http.ResponseWriter, r *http.Request) {
 	log.Println("Handle GetJob")
 
 	vars := mux.Vars(r)
@@ -68,7 +84,7 @@ func GetJobHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	j, err := globalQueue.findJobByID(id)
+	j, err := h.q.GetJobByID(id)
 	if err != nil {
 		http.Error(rw, "Job id not found", http.StatusNotFound)
 		return
