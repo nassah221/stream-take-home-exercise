@@ -7,6 +7,22 @@ import (
 	"log"
 )
 
+// I'm not sure if this is the appropriate way to keep track of job requests
+// however, since every job_id is a unique int, I can look up from the map through its key('ID')
+
+// I'm also making an assumption that I have to keep track of all jobs even after their life-cycle ends
+// i.e. after the job is concluded, so getting a concluded job will return a JSON response if the job existed in the first place
+
+// // There's also duplication in this implementation as I have to operate on the same job in 2 different places
+// // A single slice of all the jobs would be a cleaner solution but the trade-off would be verbosity
+// // 1) To search for a job to conclude, I would have to walk that single slice linearly until I find it. By separating the Dequeued jobs
+// // it's guaranteed that only the jobs that are dequeued are available to be concluded
+// // 2) Having a map allows me to look up a job_id with a single val, ok statement
+
+// Dequeued data structure was just a place holder for the jobs that were running
+// I have implemented a dispatcher and worker whose jobs are to dispatch jobs from the job queue
+// and process said jobs respectively
+
 type Queue interface {
 	Enqueue(job.Job)
 	Dequeue() (*job.Job, error)
@@ -26,6 +42,10 @@ func NewQueue(bufSize int) Queue {
 		enqueued: make(chan job.Job, bufSize),
 	}
 	q.JobRunner = runner.NewJobRunner(q.enqueued)
+
+	// Start with 10 workers - again, I'm assuming that this is an ok number to start with for an exercise
+	// Even though the queue has its own buffer, for actually running the jobs I'm assuming the number of workers
+	// as another parameter to tune/change
 	q.JobRunner.Start(10)
 
 	return &q

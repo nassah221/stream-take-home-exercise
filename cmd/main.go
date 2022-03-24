@@ -1,5 +1,15 @@
 package main
 
+// I took the basic idea about job workers & dispatcher from the following article
+// http://nesv.github.io/golang/2014/02/25/worker-queues-in-go.html
+
+// Implementing a job queue was a totally new concept for me and
+// my first approach was simplistic because I hadn't processed what I had read
+// on the internet
+
+// The mentioned article seemed like a reasonable approach. I followed it and
+// made changes to keep track of jobs when they're running/dequeued
+
 import (
 	"context"
 	"exp/job-queue/data"
